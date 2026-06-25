@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MAZE RUNNER: 3D MAZE</title>
+    <title>NEON STALKER: 3D MAZE</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
@@ -24,8 +24,8 @@
         /* Integrated game-container */
         .game-container {
             position: relative;
-            width: 700px;
-            height: 400px;
+            width: 800px;
+            height: 450px;
             max-width: 100vw;
             max-height: 56.25vw;
             border: 2px solid #0ff4;
@@ -54,7 +54,7 @@
         }
 
         .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
-        .hud-bottom { display: flex; justify-content: flex-start; align-items: flex-end; }
+        .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
 
         .stat-card {
             background: rgba(0, 10, 20, 0.7);
@@ -95,7 +95,6 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             filter: drop-shadow(0 0 15px #0ff);
-            text-align: center;
         }
 
         .btn {
@@ -132,7 +131,7 @@
             right: 20px;
             display: none;
             justify-content: space-between;
-            pointer-events: none;
+            pointer-events: none; /* Let clicks pass through empty space */
         }
 
         @media (max-width: 900px) {
@@ -146,8 +145,8 @@
             border: 2px solid rgba(0, 255, 255, 0.3);
             border-radius: 50%;
             position: relative;
-            pointer-events: auto;
-            touch-action: none;
+            pointer-events: auto; /* Capture touch only on the joysticks */
+            touch-action: none; /* Prevent scrolling when dragging */
         }
 
         .joystick-knob {
@@ -162,48 +161,9 @@
             box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
             pointer-events: none;
         }
-
-        /* Fullscreen Launcher Styles */
-        #fullscreen-start {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 999999;
-        }
-        
-        .fs-btn {
-            padding: 20px 40px;
-            font-size: 24px;
-            font-weight: bold;
-            font-family: 'Orbitron', sans-serif;
-            cursor: pointer;
-            border: 2px solid #0ff;
-            border-radius: 10px;
-            background: rgba(0, 255, 255, 0.1);
-            color: #0ff;
-            transition: 0.3s;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-        }
-        
-        .fs-btn:hover {
-            background: #0ff;
-            color: #000;
-            box-shadow: 0 0 40px rgba(0, 255, 255, 0.8);
-        }
     </style>
 </head>
 <body>
-
-<!-- Fullscreen / Start Launcher -->
-<div id="fullscreen-start">
-    <button class="fs-btn" onclick="startFullscreen()">START GAME</button>
-</div>
 
 <div class="game-container">
     <canvas id="gameCanvas"></canvas>
@@ -215,16 +175,15 @@
                 <div class="stat-label">System Level</div>
                 <div class="stat-value" id="lvlVal">01</div>
             </div>
-            <!-- Minimap -->
-            <div id="minimap-container">
-                <canvas id="minimap" width="120" height="120"></canvas>
-            </div>
         </div>
 
         <div class="hud-bottom">
             <div class="stat-card" style="border-color: #ff0;">
                 <div class="stat-label">Cores Recovered</div>
                 <div class="stat-value" id="keyVal">0 / 0</div>
+            </div>
+            <div id="minimap-container">
+                <canvas id="minimap" width="120" height="120"></canvas>
             </div>
         </div>
         
@@ -242,8 +201,8 @@
 
     <!-- Start Screen -->
     <div id="screen-start" class="overlay">
-        <h1>MAZE RUNNER</h1>
-        <p style="letter-spacing: 4px; opacity: 0.6; text-align: center;">3D CYBERNETIC INFILTRATION</p>
+        <h1>NEON STALKER</h1>
+        <p style="letter-spacing: 4px; opacity: 0.6;">3D CYBERNETIC INFILTRATION</p>
         <div style="margin-top: 20px; text-align: center; font-size: 12px; line-height: 2;">
             WASD to MOVE • MOUSE to LOOK • ESC to UNLOCK<br>
             COLLECT ALL CORES • REACH THE GREEN DATA-EXIT<br>
@@ -261,6 +220,9 @@
 </div>
 
 <script>
+/**
+ * AUDIO ENGINE
+ */
 const AudioEngine = {
     ctx: null,
     init() {
@@ -285,6 +247,9 @@ const AudioEngine = {
     step() { this.playOsc(60, 'triangle', 0.05, 0.1); }
 };
 
+/**
+ * GAME ENGINE
+ */
 const Game = {
     canvas: null, ctx: null,
     mmCanvas: null, mmCtx: null,
@@ -320,9 +285,7 @@ const Game = {
         window.addEventListener('keyup', e => this.input[e.code] = false);
         
         this.canvas.addEventListener('mousedown', () => {
-            if (this.gameState === 'playing' && this.canvas.requestPointerLock) {
-                this.canvas.requestPointerLock();
-            }
+            if (this.gameState === 'playing') this.canvas.requestPointerLock();
         });
         
         document.addEventListener('mousemove', e => {
@@ -331,6 +294,7 @@ const Game = {
             }
         });
 
+        // Virtual Joystick Setup
         const setupJoystick = (zoneId, knobId, isMove) => {
             const zone = document.getElementById(zoneId);
             const knob = document.getElementById(knobId);
@@ -338,15 +302,16 @@ const Game = {
 
             let active = false;
             let centerX, centerY;
-            const maxDist = 35; 
+            const maxDist = 35; // Maximum pixel travel of the knob
 
             const updateKnob = (e) => {
                 if (!active) return;
-                const touch = (e.targetTouches && e.targetTouches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+                const touch = e.targetTouches[0] || e.changedTouches[0];
                 let dx = touch.clientX - centerX;
                 let dy = touch.clientY - centerY;
                 const dist = Math.hypot(dx, dy);
 
+                // Cap the distance
                 if (dist > maxDist) {
                     dx = (dx / dist) * maxDist;
                     dy = (dy / dist) * maxDist;
@@ -354,6 +319,7 @@ const Game = {
 
                 knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
+                // Normalize to -1.0 to 1.0 range
                 if (isMove) this.joyMove = { x: dx / maxDist, y: dy / maxDist };
                 else this.joyLook = { x: dx / maxDist, y: dy / maxDist };
             };
@@ -403,26 +369,22 @@ const Game = {
         let floors = [];
         for(let y=0; y<this.mapH; y++) {
             for(let x=0; x<this.mapW; x++) {
-                if(this.map[y] && this.map[y][x] === 0 && (x>2 || y>2)) {
-                    floors.push({x:x+0.5, y:y+0.5});
-                }
+                if(this.map[y][x] === 0 && (x>2 || y>2)) floors.push({x:x+0.5, y:y+0.5});
             }
         }
         
         const keyCount = 2 + this.level;
         for(let i=0; i<keyCount; i++) {
-            if (floors.length === 0) break;
             const idx = Math.floor(Math.random() * floors.length);
             this.keys.push({ ...floors[idx], gathered: false, id: i });
             floors.splice(idx, 1);
         }
         
-        this.exit = floors.length > 0 ? floors[floors.length - 1] : { x: 1.5, y: 1.5 };
+        this.exit = floors[floors.length - 1];
         
         this.enemies = [];
         const enemyCount = Math.floor(this.level / 2) + 1;
         for(let i=0; i<enemyCount; i++) {
-            if (floors.length === 0) break;
             const idx = Math.floor(Math.random() * floors.length);
             this.enemies.push({ 
                 x: floors[idx].x, y: floors[idx].y, 
@@ -477,7 +439,7 @@ const Game = {
         const speed = 0.06;
         const rotSpeed = 0.05;
         
-        // Keyboard Controls
+        // Laptop Keyboard Controls
         if (this.input['KeyW'] || this.input['ArrowUp']) {
             this.movePlayer(Math.cos(this.player.dir) * speed, Math.sin(this.player.dir) * speed);
             this.player.bob += 0.2;
@@ -492,7 +454,7 @@ const Game = {
         if (this.input['ArrowLeft']) this.player.dir -= rotSpeed;
         if (this.input['ArrowRight']) this.player.dir += rotSpeed;
 
-        // Joystick Controls
+        // Mobile Joystick Controls
         if (this.joyMove.x !== 0 || this.joyMove.y !== 0) {
             const forwardMove = -this.joyMove.y * speed; 
             const strafeMove = this.joyMove.x * speed * 0.7; 
@@ -511,7 +473,7 @@ const Game = {
             this.player.dir += this.joyLook.x * rotSpeed * 1.2; 
         }
 
-        // Collectibles
+        // Gameplay Logic (Items and Enemies)
         this.keys.forEach(k => {
             if (!k.gathered && Math.hypot(this.player.x - k.x, this.player.y - k.y) < 0.4) {
                 k.gathered = true;
@@ -520,12 +482,11 @@ const Game = {
             }
         });
 
-        const allKeys = this.keys.length > 0 && this.keys.every(k => k.gathered);
-        if (allKeys && this.exit && Math.hypot(this.player.x - this.exit.x, this.player.y - this.exit.y) < 0.5) {
+        const allKeys = this.keys.every(k => k.gathered);
+        if (allKeys && Math.hypot(this.player.x - this.exit.x, this.player.y - this.exit.y) < 0.5) {
             this.endGame(true, "BREACH SUCCESSFUL");
         }
 
-        // AI Sentinel Logic
         this.enemies.forEach(e => {
             const d = Math.hypot(e.x - this.player.x, e.y - this.player.y);
             if (d < 0.4) {
@@ -550,17 +511,8 @@ const Game = {
     },
 
     movePlayer(dx, dy) {
-        const nextX = this.player.x + dx;
-        const nextY = this.player.y + dy;
-        const currentX = this.player.x;
-        const currentY = this.player.y;
-
-        if (this.map[Math.floor(currentY)]?.[Math.floor(nextX)] === 0) {
-            this.player.x = nextX;
-        }
-        if (this.map[Math.floor(nextY)]?.[Math.floor(currentX)] === 0) {
-            this.player.y = nextY;
-        }
+        if (this.map[Math.floor(this.player.y)][Math.floor(this.player.x + dx)] === 0) this.player.x += dx;
+        if (this.map[Math.floor(this.player.y + dy)][Math.floor(this.player.x)] === 0) this.player.y += dy;
     },
 
     flashDamage() {
@@ -572,9 +524,7 @@ const Game = {
 
     endGame(win, reason) {
         this.gameState = 'menu';
-        if (document.exitPointerLock) {
-            try { document.exitPointerLock(); } catch(e) {}
-        }
+        document.exitPointerLock?.();
         const screen = document.getElementById('screen-msg');
         const btn = document.getElementById('msg-btn');
         if (!screen || !btn) return;
@@ -656,9 +606,8 @@ const Game = {
         const sprites = [
             ...this.keys.filter(k => !k.gathered).map(k => ({...k, type: 'key'})),
             ...this.enemies.map(e => ({...e, type: 'enemy'})),
-            this.exit ? {...this.exit, type: 'exit'} : null
-        ].filter(Boolean);
-        
+            {...this.exit, type: 'exit'}
+        ];
         sprites.forEach(s => { s.dist = Math.hypot(this.player.x - s.x, this.player.y - s.y); });
         sprites.sort((a, b) => b.dist - a.dist);
         sprites.forEach(s => {
@@ -697,7 +646,7 @@ const Game = {
         const ch = s / this.mapH;
         for(let y=0; y<this.mapH; y++) {
             for(let x=0; x<this.mapW; x++) {
-                if(this.map[y] && this.map[y][x] > 0) {
+                if(this.map[y][x] > 0) {
                     ctx.fillStyle = '#0ff2';
                     ctx.fillRect(x*cw, y*ch, cw, ch);
                 }
@@ -707,10 +656,8 @@ const Game = {
         this.keys.forEach(k => { if(!k.gathered) ctx.fillRect(k.x*cw-1, k.y*ch-1, 2, 2); });
         ctx.fillStyle = '#f00';
         this.enemies.forEach(e => ctx.fillRect(e.x*cw-1, e.y*ch-1, 2, 2));
-        if (this.exit) {
-            ctx.fillStyle = '#0f0';
-            ctx.fillRect(this.exit.x*cw-2, this.exit.y*ch-2, 4, 4);
-        }
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(this.exit.x*cw-2, this.exit.y*ch-2, 4, 4);
         ctx.fillStyle = '#fff';
         const px = this.player.x * cw, py = this.player.y * ch;
         ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
@@ -719,26 +666,46 @@ const Game = {
     }
 };
 
+window.onload = () => {};
+</script>
+
+<!-- Fullscreen Launcher -->
+<div id="fullscreen-start" style="
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#000;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:999999;
+">
+    <button onclick="startFullscreen()" style="
+    padding:20px 40px;
+    font-size:24px;
+    font-weight:bold;
+    cursor:pointer;
+    border:none;
+    border-radius:10px;
+    background:#4ade80;
+    color:#000;
+    ">
+        PLAY FULLSCREEN
+    </button>
+</div>
+
+<script>
 function startFullscreen() {
     const elem = document.documentElement;
-    
-    let fsPromise = null;
-    try {
-        if (elem.requestFullscreen) {
-            fsPromise = elem.requestFullscreen();
-        } else if (elem.webkitRequestFullscreen) {
-            fsPromise = elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) {
-            fsPromise = elem.msRequestFullscreen();
-        }
-    } catch (err) {
-        console.warn("Fullscreen API call synchronously blocked:", err);
-    }
 
-    if (fsPromise && typeof fsPromise.catch === "function") {
-        fsPromise.catch(err => {
-            console.warn("Fullscreen request rejected asynchronously by browser permissions policy:", err);
-        });
+    if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
     }
 
     document.getElementById("fullscreen-start").style.display = "none";
@@ -746,6 +713,7 @@ function startFullscreen() {
 
 document.addEventListener("fullscreenchange", () => {
     const overlay = document.getElementById("fullscreen-start");
+
     if (!document.fullscreenElement) {
         overlay.style.display = "flex";
     } else {
