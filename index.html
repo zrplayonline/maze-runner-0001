@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MAZE RUNNER: 3D MAZE</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+        
+        body {
+            background: #020205;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'JetBrains+Mono', monospace;
+            overflow: hidden;
+            touch-action: none;
+            color: #0ff;
+        }
+
+        /* Integrated game-container */
+        .game-container {
+            position: relative;
+            width: 800px;
+            height: 450px;
+            max-width: 100vw;
+            max-height: 56.25vw;
+            border: 2px solid #0ff4;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+            overflow: hidden;
+            background: #000;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 5;
+        }
+
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .hud-bottom { display: flex; justify-content: flex-start; align-items: flex-end; }
+
+        .stat-card {
+            background: rgba(0, 10, 20, 0.7);
+            border-left: 3px solid #0ff;
+            padding: 8px 15px;
+            backdrop-filter: blur(4px);
+        }
+        .stat-label { font-size: 10px; text-transform: uppercase; opacity: 0.7; letter-spacing: 2px; }
+        .stat-value { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 900; }
+
+        #minimap-container {
+            width: 120px;
+            height: 120px;
+            border: 1px solid #0ff3;
+            background: rgba(0, 20, 30, 0.6);
+            position: relative;
+        }
+
+        /* Overlay Screens */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(1, 4, 8, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            transition: opacity 0.5s;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            letter-spacing: 12px;
+            margin-bottom: 10px;
+            background: linear-gradient(to bottom, #fff, #0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px #0ff);
+            text-align: center;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 12px 40px;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: 0.3s;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+        }
+        .btn:hover {
+            background: #0ff2;
+            box-shadow: 0 0 20px #0ff8;
+            transform: scale(1.05);
+        }
+
+        #damage-flash {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, transparent 40%, rgba(255, 0, 0, 0.4) 100%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Mobile Virtual Joysticks */
+        #mobile-ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        @media (max-width: 900px) {
+            #mobile-ui { display: flex; }
+        }
+
+        .joystick-zone {
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick-knob {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+            pointer-events: none;
+        }
+
+        /* Fullscreen Launcher Styles */
+        #fullscreen-start {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999999;
+        }
+        
+        .fs-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            background: rgba(0, 255, 255, 0.1);
+            color: #0ff;
+            transition: 0.3s;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+        
+        .fs-btn:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fullscreen / Start Launcher -->
+<div id="fullscreen-start">
+    <button class="fs-btn" onclick="startFullscreen()">START GAME</button>
+</div>
+
+<div class="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="damage-flash"></div>
+
+    <div id="hud">
+        <div class="hud-top">
+            <div class="stat-card">
+                <div class="stat-label">System Level</div>
+                <div class="stat-value" id="lvlVal">01</div>
+            </div>
+            <!-- Minimap -->
+            <div id="minimap-container">
+                <canvas id="minimap" width="120" height="120"></canvas>
+            </div>
+        </div>
+
+        <div class="hud-bottom">
+            <div class="stat-card" style="border-color: #ff0;">
+                <div class="stat-label">Cores Recovered</div>
+                <div class="stat-value" id="keyVal">0 / 0</div>
+            </div>
+        </div>
+        
+        <div id="mobile-ui">
+            <!-- Left Joystick: Movement -->
+            <div id="joy-move" class="joystick-zone">
+                <div id="knob-move" class="joystick-knob"></div>
+            </div>
+            <!-- Right Joystick: Looking/Rotation -->
+            <div id="joy-look" class="joystick-zone">
+                <div id="knob-look" class="joystick-knob"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="screen-start" class="overlay">
+        <h1>MAZE RUNNER</h1>
+        <p style="letter-spacing: 4px; opacity: 0.6; text-align: center;">3D CYBERNETIC INFILTRATION</p>
+        <div style="margin-top: 20px; text-align: center; font-size: 12px; line-height: 2;">
+            WASD to MOVE • MOUSE to LOOK • ESC to UNLOCK<br>
+            COLLECT ALL CORES • REACH THE GREEN DATA-EXIT<br>
+            AVOID THE RED SECURITY SENTINELS
+        </div>
+        <button class="btn" onclick="Game.init()">BOOT SYSTEM</button>
+    </div>
+
+    <!-- Win/Loss Screen -->
+    <div id="screen-msg" class="overlay" style="display: none;">
+        <h1 id="msg-title">SYSTEM CLEAR</h1>
+        <p id="msg-body">LEVEL 01 BREACHED SUCCESSFULLY</p>
+        <button class="btn" id="msg-btn">CONTINUE</button>
+    </div>
+</div>
+
+<script>
+const AudioEngine = {
+    ctx: null,
+    init() {
+        if (this.ctx) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    playOsc(freq, type, vol, dur) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + dur);
+    },
+    collect() { this.playOsc(880, 'sine', 0.2, 0.3); this.playOsc(1320, 'sine', 0.1, 0.4); },
+    hurt() { this.playOsc(100, 'sawtooth', 0.3, 0.2); },
+    step() { this.playOsc(60, 'triangle', 0.05, 0.1); }
+};
+
+const Game = {
+    canvas: null, ctx: null,
+    mmCanvas: null, mmCtx: null,
+    width: 400, height: 225, 
+    resScale: 2,
+    
+    gameState: 'menu',
+    level: 1,
+    map: [],
+    mapW: 0, mapH: 0,
+    
+    player: { x: 1.5, y: 1.5, dir: 0, vX: 0, vY: 0, bob: 0, health: 100 },
+    keys: [],
+    enemies: [],
+    exit: { x: 0, y: 0 },
+    
+    input: {},
+    mouseCaptured: false,
+    joyMove: { x: 0, y: 0 },
+    joyLook: { x: 0, y: 0 },
+
+    init() {
+        AudioEngine.init();
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d', { alpha: false });
+        this.mmCanvas = document.getElementById('minimap');
+        this.mmCtx = this.mmCanvas.getContext('2d');
+        
+        this.canvas.width = this.width;
+        this.canvas.height = this.height;
+        
+        window.addEventListener('keydown', e => this.input[e.code] = true);
+        window.addEventListener('keyup', e => this.input[e.code] = false);
+        
+        this.canvas.addEventListener('mousedown', () => {
+            if (this.gameState === 'playing' && this.canvas.requestPointerLock) {
+                this.canvas.requestPointerLock();
+            }
+        });
+        
+        document.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === this.canvas) {
+                this.player.dir += e.movementX * 0.004;
+            }
+        });
+
+        const setupJoystick = (zoneId, knobId, isMove) => {
+            const zone = document.getElementById(zoneId);
+            const knob = document.getElementById(knobId);
+            if (!zone || !knob) return;
+
+            let active = false;
+            let centerX, centerY;
+            const maxDist = 35; 
+
+            const updateKnob = (e) => {
+                if (!active) return;
+                const touch = (e.targetTouches && e.targetTouches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+                let dx = touch.clientX - centerX;
+                let dy = touch.clientY - centerY;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist > maxDist) {
+                    dx = (dx / dist) * maxDist;
+                    dy = (dy / dist) * maxDist;
+                }
+
+                knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+                if (isMove) this.joyMove = { x: dx / maxDist, y: dy / maxDist };
+                else this.joyLook = { x: dx / maxDist, y: dy / maxDist };
+            };
+
+            zone.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                active = true;
+                const rect = zone.getBoundingClientRect();
+                centerX = rect.left + rect.width / 2;
+                centerY = rect.top + rect.height / 2;
+                updateKnob(e);
+            }, {passive: false});
+
+            zone.addEventListener('touchmove', (e) => {
+                if(active) e.preventDefault();
+                updateKnob(e);
+            }, {passive: false});
+
+            const reset = () => {
+                active = false;
+                knob.style.transform = `translate(-50%, -50%)`;
+                if (isMove) this.joyMove = { x: 0, y: 0 };
+                else this.joyLook = { x: 0, y: 0 };
+            };
+
+            zone.addEventListener('touchend', reset);
+            zone.addEventListener('touchcancel', reset);
+        };
+
+        setupJoystick('joy-move', 'knob-move', true);
+        setupJoystick('joy-look', 'knob-look', false);
+
+        this.startLevel();
+        this.gameState = 'playing';
+        document.getElementById('screen-start').style.display = 'none';
+        
+        requestAnimationFrame((t) => this.loop(t));
+    },
+
+    startLevel() {
+        const size = 11 + (this.level * 2);
+        this.mapW = size; this.mapH = size;
+        this.generateMaze(size, size);
+        this.player.x = 1.5; this.player.y = 1.5; this.player.dir = 0;
+        
+        this.keys = [];
+        let floors = [];
+        for(let y=0; y<this.mapH; y++) {
+            for(let x=0; x<this.mapW; x++) {
+                if(this.map[y] && this.map[y][x] === 0 && (x>2 || y>2)) {
+                    floors.push({x:x+0.5, y:y+0.5});
+                }
+            }
+        }
+        
+        const keyCount = 2 + this.level;
+        for(let i=0; i<keyCount; i++) {
+            if (floors.length === 0) break;
+            const idx = Math.floor(Math.random() * floors.length);
+            this.keys.push({ ...floors[idx], gathered: false, id: i });
+            floors.splice(idx, 1);
+        }
+        
+        this.exit = floors.length > 0 ? floors[floors.length - 1] : { x: 1.5, y: 1.5 };
+        
+        this.enemies = [];
+        const enemyCount = Math.floor(this.level / 2) + 1;
+        for(let i=0; i<enemyCount; i++) {
+            if (floors.length === 0) break;
+            const idx = Math.floor(Math.random() * floors.length);
+            this.enemies.push({ 
+                x: floors[idx].x, y: floors[idx].y, 
+                targetX: floors[idx].x, targetY: floors[idx].y,
+                speed: 0.02 + (this.level * 0.005)
+            });
+            floors.splice(idx, 1);
+        }
+        
+        document.getElementById('lvlVal').textContent = this.level.toString().padStart(2, '0');
+        this.updateHUD();
+    },
+
+    generateMaze(w, h) {
+        this.map = Array.from({length: h}, () => Array(w).fill(1));
+        const stack = [[1, 1]];
+        this.map[1][1] = 0;
+        
+        while(stack.length > 0) {
+            const [cx, cy] = stack[stack.length - 1];
+            const dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
+            let carved = false;
+            for(const [dx, dy] of dirs) {
+                const nx = cx + dx, ny = cy + dy;
+                if(nx > 0 && nx < w-1 && ny > 0 && ny < h-1 && this.map[ny][nx] === 1) {
+                    this.map[cy + dy/2][cx + dx/2] = 0;
+                    this.map[ny][nx] = 0;
+                    stack.push([nx, ny]);
+                    carved = true;
+                    break;
+                }
+            }
+            if(!carved) stack.pop();
+        }
+    },
+
+    updateHUD() {
+        const gathered = this.keys.filter(k => k.gathered).length;
+        const keyEl = document.getElementById('keyVal');
+        if (keyEl) keyEl.textContent = `${gathered} / ${this.keys.length}`;
+    },
+
+    loop(t) {
+        if (this.gameState === 'playing') {
+            this.update(t);
+            this.render(t);
+        }
+        requestAnimationFrame((t) => this.loop(t));
+    },
+
+    update(t) {
+        const speed = 0.06;
+        const rotSpeed = 0.05;
+        
+        // Keyboard Controls
+        if (this.input['KeyW'] || this.input['ArrowUp']) {
+            this.movePlayer(Math.cos(this.player.dir) * speed, Math.sin(this.player.dir) * speed);
+            this.player.bob += 0.2;
+        }
+        if (this.input['KeyS'] || this.input['ArrowDown']) {
+            this.movePlayer(-Math.cos(this.player.dir) * speed, -Math.sin(this.player.dir) * speed);
+            this.player.bob += 0.2;
+        }
+        if (this.input['KeyA']) this.movePlayer(Math.cos(this.player.dir - Math.PI/2) * speed * 0.7, Math.sin(this.player.dir - Math.PI/2) * speed * 0.7);
+        if (this.input['KeyD']) this.movePlayer(Math.cos(this.player.dir + Math.PI/2) * speed * 0.7, Math.sin(this.player.dir + Math.PI/2) * speed * 0.7);
+        
+        if (this.input['ArrowLeft']) this.player.dir -= rotSpeed;
+        if (this.input['ArrowRight']) this.player.dir += rotSpeed;
+
+        // Joystick Controls
+        if (this.joyMove.x !== 0 || this.joyMove.y !== 0) {
+            const forwardMove = -this.joyMove.y * speed; 
+            const strafeMove = this.joyMove.x * speed * 0.7; 
+
+            this.movePlayer(
+                (Math.cos(this.player.dir) * forwardMove) + (Math.cos(this.player.dir + Math.PI/2) * strafeMove),
+                (Math.sin(this.player.dir) * forwardMove) + (Math.sin(this.player.dir + Math.PI/2) * strafeMove)
+            );
+            
+            if (Math.abs(forwardMove) > 0.01 || Math.abs(strafeMove) > 0.01) {
+                this.player.bob += 0.2;
+            }
+        }
+
+        if (this.joyLook.x !== 0) {
+            this.player.dir += this.joyLook.x * rotSpeed * 1.2; 
+        }
+
+        // Collectibles
+        this.keys.forEach(k => {
+            if (!k.gathered && Math.hypot(this.player.x - k.x, this.player.y - k.y) < 0.4) {
+                k.gathered = true;
+                AudioEngine.collect();
+                this.updateHUD();
+            }
+        });
+
+        const allKeys = this.keys.length > 0 && this.keys.every(k => k.gathered);
+        if (allKeys && this.exit && Math.hypot(this.player.x - this.exit.x, this.player.y - this.exit.y) < 0.5) {
+            this.endGame(true, "BREACH SUCCESSFUL");
+        }
+
+        // AI Sentinel Logic
+        this.enemies.forEach(e => {
+            const d = Math.hypot(e.x - this.player.x, e.y - this.player.y);
+            if (d < 0.4) {
+                AudioEngine.hurt();
+                this.flashDamage();
+                const angle = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+                this.movePlayer(Math.cos(angle)*0.5, Math.sin(angle)*0.5);
+            }
+            if (Math.hypot(e.x - e.targetX, e.y - e.targetY) < 0.1) {
+                const neighbors = [[0,1],[0,-1],[1,0],[-1,0]];
+                const n = neighbors[Math.floor(Math.random()*4)];
+                const nx = Math.floor(e.x) + n[0], ny = Math.floor(e.y) + n[1];
+                if (this.map[ny]?.[nx] === 0) {
+                    e.targetX = nx + 0.5; e.targetY = ny + 0.5;
+                }
+            } else {
+                e.x += (e.targetX - e.x) * e.speed;
+                e.y += (e.targetY - e.y) * e.speed;
+            }
+        });
+        this.updateHUD();
+    },
+
+    movePlayer(dx, dy) {
+        const nextX = this.player.x + dx;
+        const nextY = this.player.y + dy;
+        const currentX = this.player.x;
+        const currentY = this.player.y;
+
+        if (this.map[Math.floor(currentY)]?.[Math.floor(nextX)] === 0) {
+            this.player.x = nextX;
+        }
+        if (this.map[Math.floor(nextY)]?.[Math.floor(currentX)] === 0) {
+            this.player.y = nextY;
+        }
+    },
+
+    flashDamage() {
+        const f = document.getElementById('damage-flash');
+        if (!f) return;
+        f.style.opacity = '1';
+        setTimeout(() => f.style.opacity = '0', 150);
+    },
+
+    endGame(win, reason) {
+        this.gameState = 'menu';
+        if (document.exitPointerLock) {
+            try { document.exitPointerLock(); } catch(e) {}
+        }
+        const screen = document.getElementById('screen-msg');
+        const btn = document.getElementById('msg-btn');
+        if (!screen || !btn) return;
+        
+        document.getElementById('msg-title').textContent = win ? "BREACH CLEAR" : "SYSTEM FAILURE";
+        document.getElementById('msg-body').textContent = reason;
+        
+        btn.onclick = () => {
+            if (win) this.level++;
+            else this.level = 1;
+            screen.style.display = 'none';
+            this.startLevel();
+            this.gameState = 'playing';
+        };
+        screen.style.display = 'flex';
+    },
+
+    render(t) {
+        const ctx = this.ctx;
+        const w = this.width;
+        const h = this.height;
+        ctx.fillStyle = '#01040a';
+        ctx.fillRect(0, 0, w, h);
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, '#000');
+        grad.addColorStop(0.45, '#001a1a');
+        grad.addColorStop(0.5, '#003333');
+        grad.addColorStop(0.55, '#001a1a');
+        grad.addColorStop(1, '#000');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        const zBuffer = new Array(w).fill(Infinity);
+        const fov = Math.PI / 3;
+        const step = fov / w;
+        const startAngle = this.player.dir - fov/2;
+
+        for (let i = 0; i < w; i++) {
+            const angle = startAngle + i * step;
+            const rayX = Math.cos(angle);
+            const rayY = Math.sin(angle);
+            let dist = 0;
+            let hit = false;
+            let side = 0; 
+            let mapX = Math.floor(this.player.x);
+            let mapY = Math.floor(this.player.y);
+            let deltaX = Math.abs(1 / rayX);
+            let deltaY = Math.abs(1 / rayY);
+            let stepX, stepY, sideX, sideY;
+
+            if (rayX < 0) { stepX = -1; sideX = (this.player.x - mapX) * deltaX; }
+            else { stepX = 1; sideX = (mapX + 1.0 - this.player.x) * deltaX; }
+            if (rayY < 0) { stepY = -1; sideY = (this.player.y - mapY) * deltaY; }
+            else { stepY = 1; sideY = (mapY + 1.0 - this.player.y) * deltaY; }
+
+            while (!hit && dist < 20) {
+                if (sideX < sideY) { sideX += deltaX; mapX += stepX; side = 0; }
+                else { sideY += deltaY; mapY += stepY; side = 1; }
+                if (this.map[mapY]?.[mapX] > 0) hit = true;
+            }
+            dist = (side === 0) ? (sideX - deltaX) : (sideY - deltaY);
+            zBuffer[i] = dist;
+            const ca = this.player.dir - angle;
+            const fixDist = dist * Math.cos(ca);
+            const wallH = h / (fixDist + 0.001);
+            const light = 1 / (1 + dist * 0.2 + dist * dist * 0.02);
+            const flicker = 0.95 + Math.random() * 0.1;
+            const brightness = Math.min(255, 200 * light * flicker);
+            const color = side === 1 ? brightness * 0.7 : brightness;
+            ctx.fillStyle = `rgb(0, ${color * 0.6}, ${color})`;
+            const bob = Math.sin(this.player.bob) * 5;
+            ctx.fillRect(i, (h - wallH)/2 + bob, 1, wallH);
+            if (Math.floor(dist * 10) % 10 === 0) {
+                ctx.fillStyle = `rgba(0,255,255,0.1)`;
+                ctx.fillRect(i, (h - wallH)/2 + bob, 1, wallH);
+            }
+        }
+
+        const sprites = [
+            ...this.keys.filter(k => !k.gathered).map(k => ({...k, type: 'key'})),
+            ...this.enemies.map(e => ({...e, type: 'enemy'})),
+            this.exit ? {...this.exit, type: 'exit'} : null
+        ].filter(Boolean);
+        
+        sprites.forEach(s => { s.dist = Math.hypot(this.player.x - s.x, this.player.y - s.y); });
+        sprites.sort((a, b) => b.dist - a.dist);
+        sprites.forEach(s => {
+            if (s.dist < 0.1 || s.dist > 15) return;
+            let spriteAngle = Math.atan2(s.y - this.player.y, s.x - this.player.x) - this.player.dir;
+            while (spriteAngle < -Math.PI) spriteAngle += Math.PI * 2;
+            while (spriteAngle > Math.PI) spriteAngle -= Math.PI * 2;
+            const screenX = (spriteAngle / (fov)) * w + (w / 2);
+            const spriteSize = h / s.dist;
+            const vOffset = (h - spriteSize) / 2 + (Math.sin(t/200) * 10) + Math.sin(this.player.bob) * 5;
+            const centerX = Math.floor(screenX);
+            if (centerX >= 0 && centerX < w && zBuffer[centerX] > s.dist) {
+                ctx.fillStyle = s.type === 'key' ? '#ff0' : s.type === 'enemy' ? '#f00' : '#0f0';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = ctx.fillStyle;
+                if (s.type === 'key') ctx.fillRect(screenX - spriteSize/8, vOffset, spriteSize/4, spriteSize/4);
+                else if (s.type === 'enemy') {
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, vOffset);
+                    ctx.lineTo(screenX + spriteSize/4, vOffset + spriteSize/2);
+                    ctx.lineTo(screenX - spriteSize/4, vOffset + spriteSize/2);
+                    ctx.fill();
+                } else ctx.fillRect(screenX - spriteSize/4, vOffset, spriteSize/2, spriteSize);
+                ctx.shadowBlur = 0;
+            }
+        });
+        this.drawMinimap();
+    },
+
+    drawMinimap() {
+        const ctx = this.mmCtx;
+        if (!ctx) return;
+        const s = 120;
+        ctx.clearRect(0, 0, s, s);
+        const cw = s / this.mapW;
+        const ch = s / this.mapH;
+        for(let y=0; y<this.mapH; y++) {
+            for(let x=0; x<this.mapW; x++) {
+                if(this.map[y] && this.map[y][x] > 0) {
+                    ctx.fillStyle = '#0ff2';
+                    ctx.fillRect(x*cw, y*ch, cw, ch);
+                }
+            }
+        }
+        ctx.fillStyle = '#ff0';
+        this.keys.forEach(k => { if(!k.gathered) ctx.fillRect(k.x*cw-1, k.y*ch-1, 2, 2); });
+        ctx.fillStyle = '#f00';
+        this.enemies.forEach(e => ctx.fillRect(e.x*cw-1, e.y*ch-1, 2, 2));
+        if (this.exit) {
+            ctx.fillStyle = '#0f0';
+            ctx.fillRect(this.exit.x*cw-2, this.exit.y*ch-2, 4, 4);
+        }
+        ctx.fillStyle = '#fff';
+        const px = this.player.x * cw, py = this.player.y * ch;
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.cos(this.player.dir)*8, py + Math.sin(this.player.dir)*8); ctx.stroke();
+    }
+};
+
+function startFullscreen() {
+    const elem = document.documentElement;
+    
+    let fsPromise = null;
+    try {
+        if (elem.requestFullscreen) {
+            fsPromise = elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            fsPromise = elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+            fsPromise = elem.msRequestFullscreen();
+        }
+    } catch (err) {
+        console.warn("Fullscreen API call synchronously blocked:", err);
+    }
+
+    if (fsPromise && typeof fsPromise.catch === "function") {
+        fsPromise.catch(err => {
+            console.warn("Fullscreen request rejected asynchronously by browser permissions policy:", err);
+        });
+    }
+
+    document.getElementById("fullscreen-start").style.display = "none";
+}
+
+document.addEventListener("fullscreenchange", () => {
+    const overlay = document.getElementById("fullscreen-start");
+    if (!document.fullscreenElement) {
+        overlay.style.display = "flex";
+    } else {
+        overlay.style.display = "none";
+    }
+});
+</script>
+</body>
+</html>
